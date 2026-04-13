@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AquaGRIS – Formulaire Type génétique</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --blue: #1a6b8a;
+    --blue-dark: #0d4a63;
+    --blue-light: #e8f4f8;
+    --blue-lighter: #f0f7fb;
+    --red: #dc3545;
+    --gray-bg: #f0f4f7;
+    --white: #ffffff;
+    --text: #333;
+    --border: #cde0ea;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--gray-bg);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 0.93rem;
+    color: var(--text);
+  }
+
+  /* ── Header ── */
+  .fao-header {
+    background: linear-gradient(135deg, #1a6b8a 0%, #0d4a63 100%);
+    color: white;
+    padding: 16px 28px;
+    margin-bottom: 22px;
+    border-radius: 0 0 14px 14px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.15);
+  }
+  .fao-title { font-size: 1.35rem; font-weight: 700; line-height: 1.2; }
+  .fao-subtitle { font-size: 0.8rem; opacity: 0.82; margin-top: 2px; }
+
+  /* ── Progress ── */
+  .progress-wrap { margin-bottom: 20px; }
+  .progress-label { font-size: 0.82rem; color: #555; margin-bottom: 4px; font-weight: 500; }
+  .progress-track {
+    height: 8px; border-radius: 4px;
+    background: #dce8ef; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; width: 0%;
+    background: var(--blue);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+  }
+
+  /* ── Container ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 16px 40px; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #dce8ef; }
+  .tab-btn {
+    background: none; border: none; padding: 10px 20px;
+    font-size: 0.93rem; font-weight: 500; color: #555;
+    cursor: pointer; border-bottom: 3px solid transparent;
+    margin-bottom: -2px; transition: color 0.2s;
+  }
+  .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 700; }
+  .tab-btn:hover { color: var(--blue); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Cards ── */
+  .card-section {
+    background: white; border-radius: 10px;
+    padding: 20px 26px; margin-bottom: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid transparent;
+    transition: border-left-color 0.2s;
+  }
+  .card-section:focus-within { border-left-color: var(--blue); }
+  .section-title {
+    color: var(--blue); font-weight: 700; font-size: 1rem;
+    border-bottom: 2px solid #e0ecf3; padding-bottom: 8px;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ── Grid ── */
+  .row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; }
+  .row:last-child { margin-bottom: 0; }
+  .col-6 { flex: 1 1 calc(50% - 7px); min-width: 220px; }
+  .col-4 { flex: 1 1 calc(33.333% - 10px); min-width: 180px; }
+  .col-8 { flex: 1 1 calc(66.666% - 7px); min-width: 260px; }
+  .col-12 { flex: 1 1 100%; }
+
+  /* ── Form elements ── */
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-label { font-weight: 500; color: #333; font-size: 0.88rem; }
+  .required { color: var(--red); margin-left: 2px; }
+  .help-icon {
+    color: var(--blue); font-size: 0.75rem; margin-left: 3px;
+    cursor: help; vertical-align: super;
+  }
+  input[type="text"], input[type="email"], input[type="number"],
+  select, textarea {
+    width: 100%; padding: 7px 10px;
+    border: 1px solid #c9d8e3; border-radius: 6px;
+    font-family: inherit; font-size: 0.9rem; color: var(--text);
+    background: white; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(26,107,138,0.12);
+  }
+  textarea { resize: vertical; }
+
+  /* ── Checkboxes ── */
+  .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 4px; }
+  .checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; cursor: pointer; }
+  .checkbox-item input[type="checkbox"] {
+    width: 15px; height: 15px; cursor: pointer; accent-color: var(--blue);
+    flex-shrink: 0;
+  }
+
+  /* ── HR ── */
+  hr { border: none; border-top: 1px solid #e8ecef; margin: 14px 0; }
+
+  /* ── Conditional panels ── */
+  .conditional { display: none; }
+  .conditional.visible { display: flex; flex: 1 1 calc(33.333% - 10px); min-width: 180px; flex-direction: column; gap: 4px; }
+
+  /* ── Buttons ── */
+  .btn-export {
+    background: var(--blue); color: white; border: none;
+    padding: 10px 26px; border-radius: 8px; font-weight: 600;
+    font-size: 0.95rem; cursor: pointer; transition: background 0.2s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-export:hover { background: var(--blue-dark); }
+  .btn-tab {
+    background: none; border: 1px solid var(--blue); color: var(--blue);
+    padding: 8px 20px; border-radius: 8px; font-weight: 600;
+    font-size: 0.88rem; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-tab:hover { background: var(--blue); color: white; }
+
+  /* ── Recap ── */
+  .recap-header {
+    background: var(--blue); color: white; font-weight: 700;
+    font-size: 1.05rem; border-radius: 8px 8px 0 0;
+    padding: 12px 18px;
+  }
+  .recap-body {
+    border: 1px solid var(--border); border-top: none;
+    border-radius: 0 0 8px 8px; padding: 18px 20px;
+    margin-bottom: 10px;
+  }
+  .recap-section-title {
+    font-weight: 700; font-size: 1rem; color: var(--blue);
+    border-bottom: 2px solid #e0ecf3; padding-bottom: 6px;
+    margin-bottom: 10px; margin-top: 16px;
+  }
+  .recap-section-title:first-child { margin-top: 0; }
+  .recap-table { width: 100%; border-collapse: collapse; }
+  .recap-table td { padding: 5px 0; vertical-align: top; }
+  .recap-table td:first-child {
+    font-weight: 600; color: var(--blue); width: 45%; padding-right: 10px;
+  }
+  .recap-empty { color: #aaa; font-style: italic; }
+
+  /* ── Step boxes ── */
+  .step-box { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 20px; }
+  .step-num {
+    background: var(--blue); color: white; font-weight: 700;
+    font-size: 1.1rem; border-radius: 50%; width: 34px; height: 34px;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  }
+  .step-num.alt { background: var(--blue-dark); }
+  .step-content { flex: 1; }
+  .step-title { font-weight: 600; color: var(--blue); margin-bottom: 6px; }
+  .email-box {
+    background: #f0f7ff; border: 1px solid #b8d6f0;
+    border-radius: 8px; padding: 12px 16px;
+    font-size: 0.9rem; color: #2c5f8a;
+  }
+
+  @media (max-width: 768px) {
+    .card-section { padding: 14px; }
+    .fao-header { padding: 12px 14px; }
+    .col-6, .col-4, .col-8 { flex: 1 1 100%; }
+    .tab-btn { padding: 8px 12px; font-size: 0.85rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="fao-header">
+  <div>
+    <div class="fao-title">AquaGRIS – Formulaire Type génétique</div>
+    <div class="fao-subtitle">Food and Agriculture Organization of the United Nations | Aquatic Genetic Resources Information System</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Progress bar -->
+  <div class="progress-wrap">
+    <div class="progress-label" id="progress-label">Progression du formulaire : 0%</div>
+    <div class="progress-track">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('tab1', this)">🧬 Type génétique</button>
+    <button class="tab-btn" onclick="showTab('tab2', this)">📄 Récapitulatif</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- TAB 1 -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="tab1" class="tab-panel active">
+
+    <!-- Identification du déclarant -->
+    <div class="card-section">
+      <div class="section-title">🌍 Identification du déclarant</div>
+      <div class="row">
+        <div class="col-6 form-group">
+          <label class="form-label" for="contact">NOM Prénom</label>
+          <input type="text" id="contact" oninput="updateProgress(); updateRecap()">
+        </div>
+        <div class="col-6 form-group">
+          <label class="form-label" for="email">Email</label>
+          <input type="email" id="email" oninput="updateProgress(); updateRecap()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Espèce de référence -->
+    <div class="card-section">
+      <div class="section-title">🔬 Espèce de référence <span class="required">*</span></div>
+      <div class="row">
+        <div class="col-6 form-group">
+          <label class="form-label" for="groupe_taxo">Groupe taxonomique <span class="required">*</span></label>
+          <select id="groupe_taxo" onchange="updateEspeces(); updateProgress(); updateRecap()">
+            <option value="">(aucun)</option>
+            <option>Algues et plantes aquatiques</option>
+            <option>Crustacés</option>
+            <option>Poissons d'eau douce et euryhalins</option>
+            <option>Poissons marins</option>
+            <option>Mollusques</option>
+            <option>Animaux aquatiques divers</option>
+          </select>
+        </div>
+        <div class="col-6 form-group">
+          <label class="form-label" for="nom_espece">Nom de l'espèce <span class="required">*</span></label>
+          <select id="nom_espece" onchange="toggleNomEspeceManuel(); updateProgress(); updateRecap()">
+            <option value="">(aucun)</option>
+          </select>
+          <input type="text" id="nom_espece_manuel" placeholder="Saisir le nom de l'espèce..." style="display:none; margin-top:6px;" oninput="updateProgress(); updateRecap()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Identification de la lignée -->
+    <div class="card-section">
+      <div class="section-title">🏷️ Identification de la lignée</div>
+      <div class="row">
+        <div class="col-6 form-group">
+          <label class="form-label" for="nom_type">Nom de la lignée <span class="required">*</span></label>
+          <input type="text" id="nom_type" oninput="updateProgress(); updateRecap()">
+        </div>
+        <div class="col-6 form-group">
+          <label class="form-label" for="desc_type">Description</label>
+          <textarea id="desc_type" rows="3" placeholder="Décrivez brièvement la lignée, ses caractéristiques…" oninput="updateRecap()"></textarea>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-4 form-group">
+          <label class="form-label" for="type_primaire">Classification principale du type génétique <span class="required">*</span></label>
+          <select id="type_primaire" onchange="updateProgress(); updateRecap()">
+            <option value="">(aucun)</option>
+            <option>Propagation en captivité</option>
+            <option>Souche</option>
+            <option>Variété</option>
+            <option>Sauvage</option>
+          </select>
+        </div>
+        <div class="col-4 form-group">
+          <label class="form-label" for="pct_production">Pourcentage de la production nationale totale</label>
+          <input type="number" id="pct_production" min="0" max="100" step="1" placeholder="0–100" oninput="updateRecap()">
+        </div>
+        <div class="col-4 form-group">
+          <label class="form-label" for="origine_type">Origine de ce Type génétique</label>
+          <select id="origine_type" onchange="updateRecap()">
+            <option value="">(aucun)</option>
+            <option>Développé dans le pays</option>
+            <option>Introduite</option>
+            <option>Inconnu</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-6 form-group">
+          <label class="form-label" for="risques_different">Les risques associés à cette lignée diffèrent-ils de ceux de l'espèce ?</label>
+          <select id="risques_different" onchange="updateRecap()">
+            <option value="">(aucun)</option>
+            <option value="yes">Risques plus importants</option>
+            <option value="no">Risques moins importants</option>
+            <option value="unknown">Mêmes risques</option>
+          </select>
+        </div>
+        <div class="col-6 form-group">
+          <label class="form-label" for="composition_spp">Composition en espèces</label>
+          <select id="composition_spp" onchange="updateRecap()">
+            <option value="">(aucun)</option>
+            <option>Introgressée</option>
+            <option>Espèce pure</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Amélioration génétique -->
+    <div class="card-section">
+      <div class="section-title">🧪 Amélioration génétique</div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Ce type a-t-il été soumis à une amélioration génétique délibérée ?</label>
+        <div class="checkbox-group" id="methodes_amelio">
+          <label class="checkbox-item"><input type="checkbox" value="Sélection combinée" onchange="updateRecap()"> Sélection combinée</label>
+          <label class="checkbox-item"><input type="checkbox" value="Sélection familiale" onchange="updateRecap()"> Sélection familiale</label>
+          <label class="checkbox-item"><input type="checkbox" value="Sélection génomique" onchange="updateRecap()"> Sélection génomique</label>
+          <label class="checkbox-item"><input type="checkbox" value="Sélection assistée par marqueurs" onchange="updateRecap()"> Sélection assistée par marqueurs</label>
+          <label class="checkbox-item"><input type="checkbox" value="Sélection massale" onchange="updateRecap()"> Sélection massale</label>
+          <label class="checkbox-item"><input type="checkbox" value="Sélection intra-famille" onchange="updateRecap()"> Sélection intra-famille</label>
+          <label class="checkbox-item"><input type="checkbox" value="Non connue" onchange="updateRecap()"> Non connue</label>
+        </div>
+      </div>
+      <hr>
+      <div class="row">
+        <div class="col-6 form-group">
+          <label class="form-label" for="selection_ongoing">La sélection est-elle en cours ?</label>
+          <select id="selection_ongoing" onchange="updateRecap()">
+            <option value="">(aucun)</option>
+            <option value="yes">Oui</option>
+            <option value="no">Non</option>
+          </select>
+        </div>
+        <div class="col-6 form-group">
+          <label class="form-label" for="type_programme">Type de programme de sélection</label>
+          <select id="type_programme" onchange="updateRecap()">
+            <option value="">(aucun)</option>
+            <option>Propriété privée</option>
+            <option>Partenariat public-privé</option>
+            <option>Propriété publique</option>
+            <option>Inconnu</option>
+            <option>Autre</option>
+          </select>
+        </div>
+        <div class="col-6 form-group">
+          <label class="form-label" for="strategie_commerc">Stratégie de commercialisation / financement à long terme ?</label>
+          <select id="strategie_commerc" onchange="updateRecap()">
+            <option value="">(aucun)</option>
+            <option>Oui – ventes commerciales</option>
+            <option>Oui – financement public dédié</option>
+            <option>Oui – financement mixte</option>
+            <option>Non</option>
+            <option>En cours de développement</option>
+          </select>
+        </div>
+        <div class="col-6 form-group">
+          <label class="form-label" for="details_programme">Détails sur le programme</label>
+          <textarea id="details_programme" rows="3" placeholder="Objectifs…" oninput="updateRecap()"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique et paramètres génétiques -->
+    <div class="card-section">
+      <div class="section-title">📊 Historique et paramètres génétiques</div>
+      <div class="row">
+        <div class="col-6 form-group">
+          <label class="form-label" for="historique_doc">Historique d'élevage documenté ? <span class="help-icon" title="Archives, publications, rapports internes">ⓘ</span></label>
+          <select id="historique_doc" onchange="updateRecap()">
+            <option value="">(aucun)</option>
+            <option value="yes">Oui</option>
+            <option value="no">Non</option>
+            <option value="unknow">Inconnu</option>
+          </select>
+        </div>
+        <div class="col-6 form-group">
+          <label class="form-label" for="ref_historique">Références (historique d'élevage)</label>
+          <textarea id="ref_historique" rows="3" placeholder="Auteur, année, titre, lien…" oninput="updateRecap()"></textarea>
+        </div>
+      </div>
+      <div class="row" style="align-items: flex-end;">
+        <div class="col-4 form-group">
+          <label class="form-label" for="ne_estimable">Taille effective de population (Ne) estimable ? <span class="help-icon" title="Via données généalogiques ou génomiques">ⓘ</span></label>
+          <select id="ne_estimable" onchange="toggleNeValeur(); updateRecap()">
+            <option value="">(aucun)</option>
+            <option value="yes">Oui</option>
+            <option value="no">Non</option>
+          </select>
+        </div>
+        <div class="conditional form-group" id="ne_valeur_wrap">
+          <label class="form-label" for="ne_valeur">Taille effective de population (Ne)</label>
+          <input type="number" id="ne_valeur" min="1" step="1" oninput="updateRecap()">
+        </div>
+        <div class="col-4 form-group">
+          <label class="form-label" for="nb_generations">Nombre de générations maintenues en captivité</label>
+          <input type="number" id="nb_generations" min="0" step="1" oninput="updateRecap()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Registre national et conservation -->
+    <div class="card-section">
+      <div class="section-title">📋 Registre national et conservation</div>
+      <div class="row">
+        <div class="col-6 form-group">
+          <label class="form-label" for="raison_commerciale">Principale raison de production commerciale de cette lignée</label>
+          <textarea id="raison_commerciale" rows="3" placeholder="ex. Croissance rapide, résistance aux maladies, faible FCR…" oninput="updateRecap()"></textarea>
+        </div>
+        <div class="col-6">
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label" for="registre_national">Reconnu dans un registre national des types d'élevage ?</label>
+            <select id="registre_national" onchange="updateRecap()">
+              <option value="">(aucun)</option>
+              <option value="yes">Oui</option>
+              <option value="no">Non</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="registre_details">Détails registre</label>
+            <input type="text" id="registre_details" placeholder="Numéro d'enregistrement, organisme…" oninput="updateRecap()">
+          </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label" for="sources_registre">Sources <span class="help-icon" title="Références documentaires">ⓘ</span></label>
+        <textarea id="sources_registre" rows="2" placeholder="URLs, publications, documents officiels…" oninput="updateRecap()"></textarea>
+      </div>
+      <hr>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Ce type est-il soumis à des mesures de conservation ?</label>
+        <div class="checkbox-group" id="mesures_conservation">
+          <label class="checkbox-item"><input type="checkbox" value="Conservation in situ" onchange="updateRecap()"> Conservation in situ</label>
+          <label class="checkbox-item"><input type="checkbox" value="Conservation ex situ in vivo" onchange="updateRecap()"> Conservation ex situ in vivo</label>
+          <label class="checkbox-item"><input type="checkbox" value="Conservation ex situ in vitro" onchange="updateRecap()"> Conservation ex situ in vitro</label>
+          <label class="checkbox-item"><input type="checkbox" value="Cryoconservation" onchange="updateRecap()"> Cryoconservation</label>
+          <label class="checkbox-item"><input type="checkbox" value="Aucune" onchange="updateRecap()"> Aucune</label>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label" for="details_conservation">Détails sur les mesures de conservation <span class="help-icon" title="Localisation, organisme responsable…">ⓘ</span></label>
+        <textarea id="details_conservation" rows="3" placeholder="Décrivez les dispositifs en place…" oninput="updateRecap()"></textarea>
+      </div>
+      <hr>
+      <div class="row" style="align-items: flex-start;">
+        <div class="col-4 form-group">
+          <label class="form-label" for="export_type">Ce type a-t-il été exporté hors de votre pays ?</label>
+          <select id="export_type" onchange="toggleExportDetails(); updateRecap()">
+            <option value="">(aucun)</option>
+            <option value="yes">Oui</option>
+            <option value="no">Non</option>
+          </select>
+        </div>
+        <div class="conditional form-group" id="details_export_wrap">
+          <label class="form-label" for="details_export">Détails sur les exportations <span class="help-icon" title="Pays destinataires, volumes, dates">ⓘ</span></label>
+          <textarea id="details_export" rows="3" placeholder="ex. Espagne (2018–2022), Portugal (2020)…" oninput="updateRecap()"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:right; margin-bottom: 10px;">
+      <button class="btn-tab" onclick="showTab('tab2', document.querySelectorAll('.tab-btn')[1])">Voir le récapitulatif →</button>
+    </div>
+
+  </div><!-- /tab1 -->
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- TAB 2 -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="tab2" class="tab-panel">
+
+    <div class="card-section">
+      <div class="section-title">📝 Récapitulatif des données saisies</div>
+      <div id="recap-content">
+        <div class="recap-header">🧬 Type génétique PRIMAIRE – AquaGRIS</div>
+        <div class="recap-body" id="recap-body">
+          <p style="color:#aaa; font-style:italic;">Aucune donnée saisie pour l'instant.</p>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="card-section">
+      <div class="section-title">📧 Télécharger et envoyer votre fiche</div>
+
+      <div class="step-box">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Téléchargez votre fiche complète au format Excel</div>
+          <div style="font-size:0.86rem; color:#666; margin-bottom:10px;">Le fichier contient un onglet : Type génétique primaire.</div>
+          <button class="btn-export" onclick="exportExcel()">⬇ Télécharger la fiche Excel (.xlsx)</button>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="step-box">
+        <div class="step-num alt">2</div>
+        <div class="step-content">
+          <div class="step-title">Envoyez le fichier par e-mail</div>
+          <div class="email-box">
+            📎 Joignez le fichier Excel téléchargé à un e-mail et envoyez-le à
+            <strong>alexandra.pizzagalli@ifremer.fr</strong><br><br>
+            <span style="font-size:0.82rem; color:#666;">Objet suggéré : AquaGRIS – [Nom de l'espèce] – [Date]</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /tab2 -->
+
+</div><!-- /container -->
+
+<script>
+// ── Données espèces ─────────────────────────────────────────────────────────
+const especes = {
+  "Poissons marins": [
+    "Sparus aurata – Daurade royale","Dicentrarchus labrax – Bar européen",
+    "Scophthalmus maximus – Turbot","Solea solea – Sole commune",
+    "Argyrosomus regius – Maigre","Thunnus thynnus – Thon rouge","Gadus morhua – Cabillaud"
+  ],
+  "Poissons d'eau douce et euryhalins": [
+    "Salmo salar – Saumon atlantique","Oncorhynchus mykiss – Truite arc-en-ciel",
+    "Cyprinus carpio – Carpe commune","Anguilla anguilla – Anguille européenne","Silurus glanis – Silure glane"
+  ],
+  "Mollusques": [
+    "Crassostrea gigas – Huître creuse","Ostrea edulis – Huître plate",
+    "Mytilus edulis – Moule commune","Mytilus galloprovincialis – Moule méditerranéenne",
+    "Pecten maximus – Coquille Saint-Jacques","Haliotis tuberculata – Ormeau"
+  ],
+  "Crustacés": [
+    "Penaeus vannamei – Crevette vannamei","Penaeus monodon – Crevette géante",
+    "Homarus gammarus – Homard européen","Carcinus maenas – Crabe vert"
+  ],
+  "Algues et plantes aquatiques": [
+    "Undaria pinnatifida – Wakame","Saccharina latissima – Kombu royal",
+    "Palmaria palmata – Dulse","Porphyra umbilicalis – Nori","Gracilaria spp.","Ulva lactuca – Laitue de mer"
+  ],
+  "Animaux aquatiques divers": [
+    "Apostichopus japonicus – Concombre de mer","Paracentrotus lividus – Oursin violet",
+    "Sepia officinalis – Seiche commune","Octopus vulgaris – Pieuvre commune"
+  ]
+};
+
+// ── Tab switching ────────────────────────────────────────────────────────────
+function showTab(tabId, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  btn.classList.add('active');
+  if (tabId === 'tab2') updateRecap();
+}
+
+// ── Dynamic species list ─────────────────────────────────────────────────────
+function updateEspeces() {
+  const groupe = document.getElementById('groupe_taxo').value;
+  const sel = document.getElementById('nom_espece');
+  sel.innerHTML = '<option value="">(aucun)</option>';
+  if (especes[groupe]) {
+    especes[groupe].forEach(e => {
+      const o = document.createElement('option');
+      o.value = e; o.textContent = e;
+      sel.appendChild(o);
+    });
+  }
+  const other = document.createElement('option');
+  other.value = 'other'; other.textContent = 'Autre – saisir manuellement';
+  sel.appendChild(other);
+  toggleNomEspeceManuel();
+}
+
+function toggleNomEspeceManuel() {
+  const sel = document.getElementById('nom_espece');
+  const man = document.getElementById('nom_espece_manuel');
+  man.style.display = sel.value === 'other' ? 'block' : 'none';
+}
+
+// ── Conditional panels ───────────────────────────────────────────────────────
+function toggleNeValeur() {
+  const wrap = document.getElementById('ne_valeur_wrap');
+  wrap.classList.toggle('visible', document.getElementById('ne_estimable').value === 'yes');
+}
+
+function toggleExportDetails() {
+  const wrap = document.getElementById('details_export_wrap');
+  wrap.classList.toggle('visible', document.getElementById('export_type').value === 'yes');
+}
+
+// ── Progress bar ─────────────────────────────────────────────────────────────
+function updateProgress() {
+  const fields = [
+    document.getElementById('groupe_taxo').value,
+    getNomEspece(),
+    document.getElementById('nom_type').value,
+    document.getElementById('type_primaire').value
+  ];
+  const filled = fields.filter(f => f && f.trim() !== '').length;
+  const pct = Math.round(100 * filled / fields.length);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = 'Progression du formulaire : ' + pct + '%';
+}
+
+function getNomEspece() {
+  const sel = document.getElementById('nom_espece').value;
+  if (sel === 'other') return document.getElementById('nom_espece_manuel').value;
+  return sel;
+}
+
+function getChecked(groupId) {
+  return Array.from(document.querySelectorAll('#' + groupId + ' input:checked'))
+    .map(c => c.value);
+}
+
+function getVal(id) {
+  const el = document.getElementById(id);
+  if (!el) return '';
+  const v = el.value ? el.value.trim() : '';
+  return v;
+}
+
+function displayVal(v) {
+  if (!v || v === '') return '<span class="recap-empty">—</span>';
+  return v;
+}
+
+// ── Recap HTML ───────────────────────────────────────────────────────────────
+function updateRecap() {
+  const methodes = getChecked('methodes_amelio');
+  const mesures = getChecked('mesures_conservation');
+  const nomEspece = getNomEspece();
+
+  const sections = [
+    { title: '🌍 Identification du déclarant', rows: [
+      ['NOM Prénom', getVal('contact')],
+      ['Email', getVal('email')]
+    ]},
+    { title: '🔬 Espèce de référence', rows: [
+      ['Groupe taxonomique', getVal('groupe_taxo')],
+      ["Nom de l'espèce", nomEspece]
+    ]},
+    { title: '🏷️ Identification de la lignée', rows: [
+      ['Nom de la lignée', getVal('nom_type')],
+      ['Description', getVal('desc_type')],
+      ['Type génétique primaire', getVal('type_primaire')],
+      ['% estimé de la production de l\'espèce', getVal('pct_production')],
+      ['Origine de ce Type génétique', getVal('origine_type')],
+      ['Risques associés différents de ceux de l\'espèce ?', getVal('risques_different')],
+      ['Composition en espèces', getVal('composition_spp')]
+    ]},
+    { title: '🧪 Amélioration génétique', rows: [
+      ['Méthodes d\'amélioration génétique appliquées', methodes.join(' | ')],
+      ['La sélection est-elle en cours ?', getVal('selection_ongoing')],
+      ['Type de programme de sélection', getVal('type_programme')],
+      ['Stratégie de commercialisation / financement ?', getVal('strategie_commerc')],
+      ['Détails sur le programme', getVal('details_programme')]
+    ]},
+    { title: '📊 Historique et paramètres génétiques', rows: [
+      ["Historique d'élevage documenté ?", getVal('historique_doc')],
+      ["Références (historique d'élevage)", getVal('ref_historique')],
+      ['Taille effective de population (Ne) estimable ?', getVal('ne_estimable')],
+      ...(getVal('ne_estimable') === 'yes' ? [['Taille effective de population (Ne)', getVal('ne_valeur')]] : []),
+      ['Nombre de générations maintenues en captivité', getVal('nb_generations')]
+    ]},
+    { title: '📋 Registre national et conservation', rows: [
+      ['Principale raison de production commerciale', getVal('raison_commerciale')],
+      ['Reconnu dans un registre national ?', getVal('registre_national')],
+      ['Détails registre', getVal('registre_details')],
+      ['Sources', getVal('sources_registre')],
+      ['Mesures de conservation', mesures.join(' | ')],
+      ['Détails sur les mesures de conservation', getVal('details_conservation')],
+      ['Ce type a-t-il été exporté hors de votre pays ?', getVal('export_type')],
+      ...(getVal('export_type') === 'yes' ? [['Détails sur les exportations', getVal('details_export')]] : [])
+    ]}
+  ];
+
+  let html = '';
+  sections.forEach(s => {
+    html += '<div class="recap-section-title">' + s.title + '</div>';
+    html += '<table class="recap-table">';
+    s.rows.forEach(([label, val]) => {
+      html += '<tr><td>' + label + '</td><td>' + displayVal(val) + '</td></tr>';
+    });
+    html += '</table>';
+  });
+
+  document.getElementById('recap-body').innerHTML = html;
+}
+
+// ── Export Excel ─────────────────────────────────────────────────────────────
+function exportExcel() {
+  const methodes = getChecked('methodes_amelio');
+  const mesures = getChecked('mesures_conservation');
+  const nomEspece = getNomEspece();
+
+  const fmtVal = v => (v && v.trim() !== '') ? v : '—';
+
+  const lignes = [
+    { section: 'Identification du déclarant', label: 'NOM Prénom', valeur: getVal('contact') },
+    { section: null, label: 'Email', valeur: getVal('email') },
+    { section: 'Espèce de référence', label: 'Groupe taxonomique', valeur: getVal('groupe_taxo') },
+    { section: null, label: "Nom de l'espèce", valeur: nomEspece },
+    { section: 'Identification de la lignée', label: 'Nom de la lignée', valeur: getVal('nom_type') },
+    { section: null, label: 'Description', valeur: getVal('desc_type') },
+    { section: null, label: 'Type génétique primaire', valeur: getVal('type_primaire') },
+    { section: null, label: '% estimé de la production de l\'espèce', valeur: getVal('pct_production') },
+    { section: null, label: 'Origine de ce Type génétique', valeur: getVal('origine_type') },
+    { section: null, label: 'Risques associés différents de ceux de l\'espèce ?', valeur: getVal('risques_different') },
+    { section: null, label: 'Composition en espèces', valeur: getVal('composition_spp') },
+    { section: 'Amélioration génétique', label: 'Méthodes d\'amélioration génétique appliquées', valeur: methodes.join(' | ') },
+    { section: null, label: 'La sélection est-elle en cours ?', valeur: getVal('selection_ongoing') },
+    { section: null, label: 'Type de programme de sélection', valeur: getVal('type_programme') },
+    { section: null, label: 'Stratégie de commercialisation / financement ?', valeur: getVal('strategie_commerc') },
+    { section: null, label: 'Détails sur le programme', valeur: getVal('details_programme') },
+    { section: 'Historique et paramètres génétiques', label: "Historique d'élevage documenté ?", valeur: getVal('historique_doc') },
+    { section: null, label: "Références (historique d'élevage)", valeur: getVal('ref_historique') },
+    { section: null, label: 'Taille effective de population (Ne) estimable ?', valeur: getVal('ne_estimable') },
+  ];
+
+  if (getVal('ne_estimable') === 'yes') {
+    lignes.push({ section: null, label: 'Taille effective de population (Ne)', valeur: getVal('ne_valeur') });
+  }
+
+  lignes.push(
+    { section: null, label: 'Nombre de générations maintenues en captivité', valeur: getVal('nb_generations') },
+    { section: 'Registre national et conservation', label: 'Principale raison de production commerciale', valeur: getVal('raison_commerciale') },
+    { section: null, label: 'Reconnu dans un registre national ?', valeur: getVal('registre_national') },
+    { section: null, label: 'Détails registre', valeur: getVal('registre_details') },
+    { section: null, label: 'Sources', valeur: getVal('sources_registre') },
+    { section: null, label: 'Mesures de conservation', valeur: mesures.join(' | ') },
+    { section: null, label: 'Détails sur les mesures de conservation', valeur: getVal('details_conservation') },
+    { section: null, label: 'Ce type a-t-il été exporté hors de votre pays ?', valeur: getVal('export_type') },
+    { section: null, label: 'Détails sur les exportations', valeur: getVal('details_export') }
+  );
+
+  // Build worksheet data
+  const wsData = [['Type génétique PRIMAIRE – AquaGRIS', '']];
+  let currentSection = '';
+
+  lignes.forEach(lg => {
+    if (lg.section && lg.section !== currentSection) {
+      currentSection = lg.section;
+      wsData.push(['', '']);
+      wsData.push([currentSection, '']);
+    }
+    wsData.push([lg.label, fmtVal(lg.valeur)]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = [{ wch: 52 }, { wch: 60 }];
+
+  // Basic styles via cell metadata (SheetJS community doesn't support full styles, but we set wch)
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Type génétique');
+
+  const nomFichier = nomEspece ? nomEspece.replace(/[^A-Za-z0-9]/g, '_').substring(0, 30) : 'espece';
+  const today = new Date();
+  const dateStr = today.getFullYear().toString() +
+    String(today.getMonth()+1).padStart(2,'0') +
+    String(today.getDate()).padStart(2,'0');
+
+  XLSX.writeFile(wb, 'AquaGRIS_TypeElevage_' + nomFichier + '_' + dateStr + '.xlsx');
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+updateEspeces();
+updateProgress();
+updateRecap();
+</script>
+</body>
+</html>
