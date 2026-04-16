@@ -239,6 +239,7 @@
     .fao-header   { padding: 12px 14px; }
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -309,10 +310,8 @@
         </div>
         <div class="col-4">
           <div class="form-group">
-            <label class="form-label" for="nom_espece">Nom de l'espèce</label>
-            <select id="nom_espece">
-              <option value="">(aucun)</option>
-            </select>
+            <label class="form-label" for="nom_espece">Nom de l'espèce <span class="help-icon" title="Ex : Sparus aurata – Daurade royale">ⓘ</span></label>
+            <input type="text" id="nom_espece" placeholder="ex. Sparus aurata – Daurade royale" oninput="updateProgress()">
           </div>
         </div>
         <div class="col-4">
@@ -737,11 +736,9 @@
         <div class="step-num">1</div>
         <div style="flex:1;">
           <div style="font-weight:600; color:var(--blue); margin-bottom:6px;">Exportez vos données</div>
-          <div style="font-size:.86rem; color:#666; margin-bottom:10px;">Téléchargez un fichier CSV de vos données, ou copiez le JSON pour l'utiliser dans vos outils.</div>
+          <div style="font-size:.86rem; color:#666; margin-bottom:10px;">Téléchargez un fichier Excel formaté de vos données, prêt à être envoyé.</div>
           <div class="export-actions">
-            <button class="btn-primary" onclick="exportCSV()">⬇ Télécharger CSV</button>
-            <button class="btn-tab-nav" onclick="copyJSON()">📋 Copier JSON</button>
-            <button class="btn-tab-nav" onclick="window.print()">🖨️ Imprimer / PDF</button>
+            <button class="btn-primary" onclick="exportExcel()">⬇ Télécharger Excel</button>
           </div>
         </div>
       </div>
@@ -830,25 +827,7 @@ function switchTab(id, btn) {
   if (id === 'tab-recap') buildRecap();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Espèces dynamiques
-// ─────────────────────────────────────────────────────────────────────────────
-function updateEspeces() {
-  const groupe = document.getElementById('groupe_taxo').value;
-  const sel    = document.getElementById('nom_espece');
-  sel.innerHTML = '<option value="">(aucun)</option>';
-  if (ESPECES[groupe]) {
-    ESPECES[groupe].forEach(e => {
-      const o = document.createElement('option');
-      o.value = e; o.textContent = e;
-      sel.appendChild(o);
-    });
-    const other = document.createElement('option');
-    other.value = 'other'; other.textContent = 'Autre – saisir manuellement';
-    sel.appendChild(other);
-  }
-  updateProgress();
-}
+// (updateEspeces supprimé – nom_espece est maintenant un champ texte libre)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Conditional panels
@@ -956,7 +935,7 @@ function removeItem(id) {
 function updateProgress() {
   const fields = [
     v('groupe_taxo')     !== '',
-    v('nom_espece')      !== '' && v('nom_espece') !== '(aucun)',
+    v('nom_espece')      !== '',
     [...document.querySelectorAll('#objectif_elevage input:checked')].length > 0,
     v('prod_volume')     !== '',
     v('prod_valeur')     !== '',
@@ -1145,9 +1124,151 @@ function buildRecap() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Export CSV
+// Export Excel (SheetJS) – même mise en forme que le R Shiny openxlsx
 // ─────────────────────────────────────────────────────────────────────────────
-function exportCSV() {
+function exportExcel() {
+  const s = collectData();
+  const isNN      = s.espece_native === 'no';
+  const isSauvage = s.recolte_sauvage === 'yes';
+
+  const fmtVal = (v) => {
+    if (!v || v === '' || v === '(aucun)') return '—';
+    if (Array.isArray(v)) return v.join(' | ') || '—';
+    if (v === 'yes') return 'Oui';
+    if (v === 'no')  return 'Non';
+    return String(v);
+  };
+
+  const lignes = [];
+  const add = (section, label, val) => lignes.push({ section, label, valeur: fmtVal(val) });
+
+  add('Identification du déclarant', 'NOM Prénom', s.contact);
+  add(null, 'Email', s.email);
+  add('Espèce', 'Groupe taxonomique', s.groupe_taxo);
+  add(null, "Nom de l'espèce", s.nom_espece);
+  add(null, 'Nom commun officiel', s.nom_commun);
+  add(null, 'Espèce native dans votre pays ?', s.espece_native);
+
+  if (isNN) {
+    add('Espèce non native – Risques & restrictions', 'Évaluation des risques réalisée ?', s.evaluation_risque);
+    add(null, 'Espèce établie en milieu naturel ?', s.etablie_sauvage);
+    add(null, 'Impact négatif sur la biodiversité ?', s.impact_biodiv);
+    add(null, 'Culture restreinte dans votre pays ?', s.culture_restreinte);
+    add(null, 'Précisions restrictions', s.culture_details);
+  }
+
+  add('Changement climatique', 'Le changement climatique impacte-t-il cette espèce ?', s.impact_climatique);
+  add(null, 'Détails (changement climatique)', s.impact_climatique_details);
+
+  const objLabel = s.objectif_elevage.length > 0
+    ? s.objectif_elevage.join(' | ') + (s.objectif_autre ? ' | ' + s.objectif_autre : '')
+    : '';
+  add("Production aquacole", "Principaux objectifs d'élevage", objLabel);
+  add(null, 'Système de culture le plus courant', s.systeme_culture);
+  add(null, 'Volume de production (tonnes)', s.prod_volume);
+  add(null, 'Valeur de production (USD)', s.prod_valeur);
+  add(null, 'Année de référence', s.annee_ref);
+  add(null, 'Cohérent avec les données FAO / FishstatJ ?', s.coherence_fao);
+  add(null, 'Source des informations', s.source_info);
+  add(null, 'Tendance de la production (10 ans)', s.tendance_prod);
+
+  if (s.produits_secondaires.length > 0) {
+    s.produits_secondaires.forEach((p, i) => {
+      add(i === 0 ? 'Produits secondaires aquaculture' : null, 'Produit ' + (i+1), p.nom + (p.desc ? ' – ' + p.desc : ''));
+    });
+  }
+
+  add("Types d'élevage reconnaissables", "Types d'élevage reconnaissables pour cette espèce ?", s.types_reconnus);
+  add('Stocks sauvages', 'Espèce également récoltée de populations sauvages ?', s.recolte_sauvage);
+
+  if (isSauvage) {
+    add(null, 'Volume récolté (tonnes)', s.peche_volume);
+    add(null, 'Valeur récoltée (USD)', s.peche_valeur);
+    add(null, 'Année de référence (pêche)', s.peche_annee);
+    add(null, 'Cohérent avec les données FAO ?', s.peche_coherence_fao);
+    add(null, 'Tendance actuelle de la récolte (10 ans)', s.tendance_peche);
+    add(null, 'Principal usage du produit sauvage', s.usage_sauvage);
+    add(null, 'Type de pêcherie principal', s.type_pecherie);
+    add(null, "Statut de l'habitat / aire de répartition", s.statut_habitat);
+    add(null, "Risque d'extinction – Liste Rouge UICN", s.evaluation_iucn);
+    add(null, 'Unités de gestion reconnues dans votre pays ?', s.unites_gestion);
+    add(null, 'Stocks génétiques identifiés dans votre pays ?', s.stocks_genetiques);
+    if (s.produits_peche.length > 0) {
+      s.produits_peche.forEach((p, i) => {
+        add(null, 'Produit pêche ' + (i+1), p.nom + (p.desc ? ' – ' + p.desc : ''));
+      });
+    }
+  }
+
+  // Build worksheet data
+  const wsData  = [];
+  const merges  = [];
+  const rowMeta = [];
+
+  wsData.push(['FORMULAIRE ESPÈCE – AquaGRIS', '']);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } });
+  rowMeta.push('titre');
+
+  let currentSection = '';
+  lignes.forEach(lg => {
+    if (lg.section && lg.section !== currentSection) {
+      currentSection = lg.section;
+      wsData.push(['', '']);
+      rowMeta.push('spacer');
+      merges.push({ s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 1 } });
+      wsData.push([currentSection, '']);
+      merges.push({ s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 1 } });
+      rowMeta.push('section');
+    }
+    wsData.push([lg.label, lg.valeur]);
+    rowMeta.push(lg.valeur === '—' ? 'vide' : 'data');
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!merges'] = merges;
+  ws['!cols'] = [{ wch: 52 }, { wch: 60 }];
+
+  const rowH = rowMeta.map(t => {
+    if (t === 'titre')   return { hpt: 22 };
+    if (t === 'section') return { hpt: 18 };
+    if (t === 'spacer')  return { hpt: 6 };
+    return { hpt: 15 };
+  });
+  ws['!rows'] = rowH;
+
+  const BLEU    = '1a6b8a';
+  const BLEU_BG = 'e8f4f8';
+  const GRIS    = 'f5f5f5';
+  const WHITE   = 'FFFFFF';
+
+  function styleCell(r, c, style) {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+    ws[addr].s = style;
+  }
+
+  const sTitre   = { font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: BLEU } },    alignment: { horizontal: 'left', vertical: 'center' }, border: { bottom: { style: 'medium', color: { rgb: BLEU } } } };
+  const sSection = { font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: BLEU } },     fill: { fgColor: { rgb: BLEU_BG } }, alignment: { horizontal: 'left', vertical: 'center' }, border: { bottom: { style: 'thin',   color: { rgb: BLEU } } } };
+  const sLabel   = { font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '333333' } }, fill: { fgColor: { rgb: GRIS } },    alignment: { horizontal: 'left', vertical: 'top', wrapText: true } };
+  const sValeur  = { font: { name: 'Calibri', sz: 10,             color: { rgb: '111111' } }, fill: { fgColor: { rgb: WHITE } },   alignment: { horizontal: 'left', vertical: 'top', wrapText: true } };
+  const sVide    = { font: { name: 'Calibri', sz: 10, italic: true, color: { rgb: 'aaaaaa' } }, fill: { fgColor: { rgb: WHITE } }, alignment: { horizontal: 'left', vertical: 'top', wrapText: true } };
+  const sBlank   = { fill: { fgColor: { rgb: WHITE } } };
+
+  rowMeta.forEach((t, r) => {
+    if      (t === 'titre')   { styleCell(r, 0, sTitre);   styleCell(r, 1, sTitre); }
+    else if (t === 'section') { styleCell(r, 0, sSection); styleCell(r, 1, sSection); }
+    else if (t === 'spacer')  { styleCell(r, 0, sBlank);   styleCell(r, 1, sBlank); }
+    else                      { styleCell(r, 0, sLabel);   styleCell(r, 1, t === 'vide' ? sVide : sValeur); }
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Espèce');
+
+  const espece = s.nom_espece ? s.nom_espece.replace(/[^A-Za-z0-9]/g, '_').slice(0, 30) : 'espece';
+  const date   = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  XLSX.writeFile(wb, 'AquaGRIS_Espece_' + espece + '_' + date + '.xlsx');
+}
+
   const s = collectData();
   const rows = [
     ['Section', 'Champ', 'Valeur'],
@@ -1206,20 +1327,6 @@ function exportCSV() {
   const date   = new Date().toISOString().slice(0,10).replace(/-/g,'');
   const fname  = `AquaGRIS_Espece_${espece}_${date}.csv`;
 
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = fname; a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Copy JSON
-// ─────────────────────────────────────────────────────────────────────────────
-function copyJSON() {
-  const json = JSON.stringify(collectData(), null, 2);
-  navigator.clipboard.writeText(json).then(() => showToast('✅ JSON copié !'));
-}
 
 function showToast(msg) {
   const t = document.getElementById('toast');
